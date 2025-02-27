@@ -77,6 +77,8 @@ import {
   showPlugins,
 } from "../utils";
 
+import { useStore1 } from "../utils/store1";
+
 import { uploadImage as uploadImageRemote } from "@/app/utils/chat";
 
 import dynamic from "next/dynamic";
@@ -491,6 +493,28 @@ function useScrollToBottom(
   };
 }
 
+const queryParam = (cb: Function | undefined, cb1: Function | undefined) => {
+  const { data, setData } = useStore1.getState();
+
+  const model_p = data["model"];
+
+  console.log("model_p", model_p);
+  if (model_p && cb) {
+    data["model"] = undefined;
+    setData(data);
+    cb(model_p);
+  }
+
+  const msg = data["msg"];
+  console.log("msg", msg);
+
+  if (cb1 && msg) {
+    data["msg"] = undefined;
+    setData(data);
+    cb1(msg);
+  }
+};
+
 export function ChatActions(props: {
   uploadImage: () => void;
   setAttachImages: (images: string[]) => void;
@@ -559,6 +583,7 @@ export function ChatActions(props: {
   const [showSizeSelector, setShowSizeSelector] = useState(false);
   const [showQualitySelector, setShowQualitySelector] = useState(false);
   const [showStyleSelector, setShowStyleSelector] = useState(false);
+
   const modelSizes = getModelSizes(currentModel);
   const dalle3Qualitys: DalleQuality[] = ["standard", "hd"];
   const dalle3Styles: DalleStyle[] = ["vivid", "natural"];
@@ -568,6 +593,8 @@ export function ChatActions(props: {
   const currentStyle = session.mask.modelConfig?.style ?? "vivid";
 
   const isMobileScreen = useMobileScreen();
+
+  const [query_param_flag, setQueryParamFlag] = useState(false);
 
   useEffect(() => {
     const show = isVisionModel(currentModel);
@@ -594,7 +621,41 @@ export function ChatActions(props: {
           : nextModel.name,
       );
     }
+
+    // if(!query_param_flag) {
+
+    //   setQueryParamFlag(true);
+    //   queryParam(setModel,undefined);
+    // }
+
+    queryParam(setModel, undefined);
   }, [chatStore, currentModel, models, session]);
+
+  /***
+   * 添加自动跳转时自动填充参数且自动设置模型
+   */
+  const setModel = (s: string) => {
+    console.log("setModel", s);
+    if (!s) {
+      return;
+    }
+    const [model, providerName] = getModelProvider(s);
+
+    console.log(model, providerName);
+    chatStore.updateTargetSession(session, (session) => {
+      session.mask.modelConfig.model = model as ModelType;
+      session.mask.modelConfig.providerName = providerName as ServiceProvider;
+      session.mask.syncGlobalConfig = false;
+    });
+    if (providerName == "ByteDance") {
+      const selectedModel = models.find(
+        (m) => m.name == model && m?.provider?.providerName == providerName,
+      );
+      showToast(selectedModel?.displayName ?? "");
+    } else {
+      showToast(model);
+    }
+  };
 
   return (
     <div className={styles["chat-input-actions"]}>
@@ -692,24 +753,10 @@ export function ChatActions(props: {
             }))}
             onClose={() => setShowModelSelector(false)}
             onSelection={(s) => {
+              console.log(s);
               if (s.length === 0) return;
-              const [model, providerName] = getModelProvider(s[0]);
-              chatStore.updateTargetSession(session, (session) => {
-                session.mask.modelConfig.model = model as ModelType;
-                session.mask.modelConfig.providerName =
-                  providerName as ServiceProvider;
-                session.mask.syncGlobalConfig = false;
-              });
-              if (providerName == "ByteDance") {
-                const selectedModel = models.find(
-                  (m) =>
-                    m.name == model &&
-                    m?.provider?.providerName == providerName,
-                );
-                showToast(selectedModel?.displayName ?? "");
-              } else {
-                showToast(model);
-              }
+
+              setModel(s[0]);
             }}
           />
         )}
@@ -1064,8 +1111,19 @@ function _Chat() {
     },
   );
 
+  const [query_param_flag, setQueryParamFlag] = useState(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(measure, [userInput]);
+  useEffect(() => {
+    measure();
+    // if(!query_param_flag) {
+
+    //   setQueryParamFlag(true);
+    //   queryParam(undefined,doSubmit);
+
+    // }
+
+    queryParam(undefined, doSubmit);
+  }, [userInput]);
 
   // chat commands shortcuts
   const chatCommands = useChatCommand({
@@ -1103,6 +1161,7 @@ function _Chat() {
   };
 
   const doSubmit = (userInput: string) => {
+    console.log("doSubmit", userInput);
     if (userInput.trim() === "" && isEmpty(attachImages)) return;
     const matchCommand = chatCommands.match(userInput);
     if (matchCommand.matched) {

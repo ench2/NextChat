@@ -52,6 +52,13 @@ const Chat = dynamic(async () => (await import("./chat")).Chat, {
   loading: () => <Loading noLogo />,
 });
 
+const ChatParam = dynamic(
+  async () => (await import("./chat-param")).ChatParam,
+  {
+    loading: () => <Loading noLogo />,
+  },
+);
+
 const NewChat = dynamic(async () => (await import("./new-chat")).NewChat, {
   loading: () => <Loading noLogo />,
 });
@@ -202,6 +209,7 @@ function Screen() {
             <Route path={Path.Chat} element={<Chat />} />
             <Route path={Path.Settings} element={<Settings />} />
             <Route path={Path.McpMarket} element={<McpMarketPage />} />
+            <Route path={Path.ChatParam} element={<ChatParam />} />
           </Routes>
         </WindowContent>
       </>
@@ -219,6 +227,19 @@ function Screen() {
     </div>
   );
 }
+
+const queryParamCode = () => {
+  const accessStore = useAccessStore.getState();
+  let s = window.location.search;
+  const urlParams = new URLSearchParams(s);
+  const code = urlParams.get("code");
+
+  console.log("code", code);
+
+  if (code) {
+    accessStore.update((access) => (access.accessCode = code));
+  }
+};
 
 export function useLoadData() {
   const config = useAppConfig();
@@ -242,6 +263,7 @@ export function Home() {
   useEffect(() => {
     console.log("[Config] got config from build time", getClientConfig());
     useAccessStore.getState().fetch();
+    queryParamCode();
 
     const initMcp = async () => {
       try {

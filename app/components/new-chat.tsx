@@ -111,6 +111,10 @@ export function NewChat() {
       maskRef.current.scrollLeft =
         (maskRef.current.scrollWidth - maskRef.current.clientWidth) / 2;
     }
+
+    let s = window.location.search;
+    const urlParams = new URLSearchParams(s);
+    const msg = urlParams.get("msg");
   }, [groups]);
 
   return (
